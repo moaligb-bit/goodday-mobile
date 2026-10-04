@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoodDay Custom Mobile Client</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Lucide Icons for premium native look -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        /* Hide scrollbars for ultra-clean mobile appearance */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Sticky Native-Style Header -->
+    <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div class="flex items-center space-x-2">
+            <div class="bg-indigo-600 p-2 rounded-xl shadow-md shadow-indigo-600/20">
+                <i data-lucide="layout-grid" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base tracking-tight text-white">GoodDay Custom</h1>
+                <p class="text-xs text-slate-400 font-medium" id="connection-status">Disconnected</p>
+            </div>
+        </div>
+        <button id="settings-btn" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all duration-200">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <!-- Settings & API Token Modal Drawer -->
+    <div id="settings-drawer" class="fixed inset-0 z-50 hidden bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300">
+        <div class="absolute bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 shadow-2xl max-w-md mx-auto transform translate-y-0 transition-transform duration-300">
+            <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-5"></div>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-5 h-5 text-indigo-400"></i> API Configuration
+                </h2>
+                <button id="close-settings" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+                Your credentials are saved strictly inside your local phone storage (<code class="bg-slate-800 px-1 py-0.5 rounded text-indigo-300">localStorage</code>) and are sent directly to GoodDay.
+            </p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">GoodDay Personal API Token</label>
+                    <input type="password" id="api-token" placeholder="Paste your gd-api-token here..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Project ID (Optional)</label>
+                    <input type="text" id="project-id" placeholder="Leave empty for all accessible tasks" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+                </div>
+                <button id="save-config" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98]">
+                    Save & Initialize
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4 overflow-y-auto">
+        
+        <!-- Search & Control Panel -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3.5">
+            <!-- Search Input -->
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-3.5 w-4 h-4 text-slate-500"></i>
+                <input type="text" id="search-query" placeholder="Search tasks by name or key..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all">
+            </div>
+
+            <!-- Filters Matrix -->
+            <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status Filter</label>
+                    <select id="filter-status" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 font-medium focus:outline-none focus:border-indigo-500">
+                        <option value="all">All Statuses</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sorting Matrix</label>
+                    <select id="sort-by" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 font-medium focus:outline-none focus:border-indigo-500">
+                        <option value="date-desc">Deadline (Newest First)</option>
+                        <option value="date-asc">Deadline (Oldest First)</option>
+                        <option value="priority-high">Priority (Highest First)</option>
+                        <option value="name-asc">Alphabetical (A-Z)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Ribbons / Fast Toggles -->
+        <div class="flex items-center space-x-2 overflow-x-auto pb-1" id="metrics-bar">
+            <button id="tab-all" class="px-3.5 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-full shadow-sm whitespace-nowrap active:scale-95 transition-all">
+                All <span id="count-all" class="ml-1 bg-indigo-700/60 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+            </button>
+            <button id="tab-high" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold rounded-full border border-slate-700/40 whitespace-nowrap active:scale-95 transition-all">
+                ⚠️ High Priority <span id="count-high" class="ml-1 bg-slate-700 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+            </button>
+            <button id="tab-today" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold rounded-full border border-slate-700/40 whitespace-nowrap active:scale-95 transition-all">
+                📅 Due Soon <span id="count-soon" class="ml-1 bg-slate-700 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+            </button>
+        </div>
+
+        <!-- Tasks Target Area -->
+        <div id="tasks-container" class="space-y-3 pb-12">
+            <!-- Initial Prompt State -->
+            <div id="empty-state" class="text-center py-12 px-4 bg-slate-900 border border-slate-800 rounded-2xl border-dashed">
+                <div class="inline-flex bg-slate-800 p-3 rounded-full mb-3 text-slate-400">
+                    <i data-lucide="key-round" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-bold text-sm text-slate-200">API Configuration Required</h3>
+                <p class="text-xs text-slate-400 max-w-xs mx-auto mt-1 leading-relaxed">
+                    Click the settings gear icon in the top right corner to configure your personal GoodDay token.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Global App Handling Script Engine -->
+    <script>
+        // State Management
+        let appState = {
+            token: localStorage.getItem('gd_api_token') || '',
+            projectId: localStorage.getItem('gd_project_id') || '',
+            rawTasks: [],
+            filteredTasks: [],
+            currentTab: 'all' // all, high, soon
+        };
+
+        // DOM Elements
+        const elements = {
+            settingsDrawer: document.getElementById('settings-drawer'),
+            settingsBtn: document.getElementById('settings-btn'),
+            closeSettings: document.getElementById('close-settings'),
+            saveConfig: document.getElementById('save-config'),
+            apiTokenInput: document.getElementById('api-token'),
+            projectIdInput: document.getElementById('project-id'),
+            connectionStatus: document.getElementById('connection-status'),
+            tasksContainer: document.getElementById('tasks-container'),
+            emptyState: document.getElementById('empty-state'),
+            searchQuery: document.getElementById('search-query'),
+            filterStatus: document.getElementById('filter-status'),
+            sortBy: document.getElementById('sort-by'),
+            tabAll: document.getElementById('tab-all'),
+            tabHigh: document.getElementById('tab-high'),
+            tabToday: document.getElementById('tab-today'),
+            countAll: document.getElementById('count-all'),
+            countHigh: document.getElementById('count-high'),
+            countSoon: document.getElementById('count-soon')
+        };
+
+        // Initialize UI Elements
+        if (appState.token) {
+            elements.apiTokenInput.value = appState.token;
+            elements.projectIdInput.value = appState.projectId;
+            initializeConnection();
+        }
+
+        // Drawers & Open Closers
+        elements.settingsBtn.addEventListener('click', () => {
+            elements.settingsDrawer.classList.remove('hidden');
+        });
+        elements.settingsDrawer.addEventListener('click', (e) => {
+            if(e.target === elements.settingsDrawer) elements.settingsDrawer.classList.add('hidden');
+        });
+        elements.closeSettings.addEventListener('click', () => {
+            elements.settingsDrawer.classList.add('hidden');
+        });
+
+        // Config Saving Actions
+        elements.saveConfig.addEventListener('click', () => {
+            const token = elements.apiTokenInput.value.trim();
+            const projId = elements.projectIdInput.value.trim();
+            
+            if(!token) {
+                alert('Please enter a valid token');
+                return;
+            }
+
+            localStorage.setItem('gd_api_token', token);
+            localStorage.setItem('gd_project_id', projId);
+            appState.token = token;
+            appState.projectId = projId;
+            
+            elements.settingsDrawer.classList.add('hidden');
+            initializeConnection();
+        });
+
+        // Live Dynamic Filtering Listeners
+        elements.searchQuery.addEventListener('input', runProcessingPipeline);
+        elements.filterStatus.addEventListener('change', runProcessingPipeline);
+        elements.sortBy.addEventListener('change', runProcessingPipeline);
+
+        // Tab Filtering
+        elements.tabAll.addEventListener('click', () => { switchTab('all'); });
+        elements.tabHigh.addEventListener('click', () => { switchTab('high'); });
+        elements.tabToday.addEventListener('click', () => { switchTab('soon'); });
+
+        function switchTab(tabName) {
+            appState.currentTab = tabName;
+            [elements.tabAll, elements.tabHigh, elements.tabToday].forEach(el => {
+                el.classList.remove('bg-indigo-600', 'text-white', 'bg-slate-800', 'text-slate-300');
+                el.classList.add('bg-slate-800', 'text-slate-300');
+            });
+            
+            if(tabName === 'all') elements.tabAll.classList.replace('bg-slate-800', 'bg-indigo-600');
+            if(tabName === 'high') elements.tabHigh.classList.replace('bg-slate-800', 'bg-indigo-600');
+            if(tabName === 'soon') elements.tabToday.classList.replace('bg-slate-800', 'bg-indigo-600');
+            
+            runProcessingPipeline();
+        }
+
+        // Network Layer: Fetch from GoodDay API
+        async function initializeConnection() {
+            elements.connectionStatus.innerText = "Connecting...";
+            elements.connectionStatus.className = "text-xs text-amber-400 font-medium";
+            
+            // Build proper endpoints depending on if a scoped project is targeted
+            let url = "https://api.goodday.work/2.0/tasks?limit=150";
+            if(appState.projectId) {
+                url = `https://api.goodday.work/2.0/projects/${appState.projectId}/tasks`;
+            }
+
+            try {
+                // GoodDay API requires direct header execution
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'gd-api-token': appState.token,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if(!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
+                
+                const data = await response.json();
+                // Ensure data is structured into array formats
+                appState.rawTasks = Array.isArray(data) ? data : (data.tasks || []);
+                
+                elements.connectionStatus.innerText = "Connected & Synced";
+                elements.connectionStatus.className = "text-xs text-emerald-400 font-medium";
+                
+                populateStatusDropdown();
+                updateMetricCounters();
+                runProcessingPipeline();
+
+            } catch (error) {
+                console.error(error);
+                elements.connectionStatus.innerText = "Sync Failed / Check Token";
+                elements.connectionStatus.className = "text-xs text-rose-400 font-medium";
+                showErrorState(error.message);
+            }
+        }
+
+        function populateStatusDropdown() {
+            const statuses = [...new Set(appState.rawTasks.map(t => t.status ? t.status.name : 'Unknown'))].filter(Boolean);
+            elements.filterStatus.innerHTML = '<option value="all">All Statuses</option>';
+            statuses.forEach(status => {
+                const opt = document.createElement('option');
+                opt.value = status;
+                opt.innerText = status;
+                elements.filterStatus.appendChild(opt);
+            });
+        }
+
+        function updateMetricCounters() {
+            elements.countAll.innerText = appState.rawTasks.length;
+            elements.countHigh.innerText = appState.rawTasks.filter(t => t.priority === 4 || t.priority === 5 || (t.priority && t.priority.toString().toLowerCase() === 'high')).length;
+            
+            // Due soon check (within next 3 days)
+            const threeDaysFromNow = new Date();
+            threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+            const soonCount = appState.rawTasks.filter(t => t.deadline && new Date(t.deadline) <= threeDaysFromNow).length;
+            elements.countSoon.innerText = soonCount;
+        }
+
+        // Local Processing Pipeline: Search, Filter, Tab Switch, Sort
+        function runProcessingPipeline() {
+            let processed = [...appState.rawTasks];
+
+            // 1. Search Query Box
+            const search = elements.searchQuery.value.toLowerCase().trim();
+            if (search) {
+                processed = processed.filter(t => 
+                    (t.name && t.name.toLowerCase().includes(search)) || 
+                    (t.id && t.id.toString().includes(search))
+                );
+            }
+
+            // 2. Dropdown Status Filter
+            const statusFilter = elements.filterStatus.value;
+            if (statusFilter !== 'all') {
+                processed = processed.filter(t => t.status && t.status.name === statusFilter);
+            }
+
+            // 3. Ribbon Tab Filters
+            if (appState.currentTab === 'high') {
+                processed = processed.filter(t => t.priority === 4 || t.priority === 5 || (t.priority && t.priority.toString().toLowerCase() === 'high'));
+            } else if (appState.currentTab === 'soon') {
+                const threeDays = new Date();
+                threeDays.setDate(threeDays.getDate() + 3);
+                processed = processed.filter(t => t.deadline && new Date(t.deadline) <= threeDays);
+            }
+
+            // 4. Sort Matrix
+            const sorting = elements.sortBy.value;
+            processed.sort((a, b) => {
+                if (sorting === 'date-asc') {
+                    return new Date(a.deadline || '2999-12-31') - new Date(b.deadline || '2999-12-31');
+                } else if (sorting === 'date-desc') {
+                    return new Date(b.deadline || '1970-01-01') - new Date(a.deadline || '1970-01-01');
+                } else if (sorting === 'priority-high') {
+                    return (b.priority || 0) - (a.priority || 0);
+                } else if (sorting === 'name-asc') {
+                    return (a.name || '').localeCompare(b.name || '');
+                }
+                return 0;
+            });
+
+            appState.filteredTasks = processed;
+            renderTaskCards();
+        }
+
+        // Render Cards Matrix to UI
+        function renderTaskCards() {
+            elements.tasksContainer.innerHTML = '';
+            
+            if(appState.filteredTasks.length === 0) {
+                elements.tasksContainer.innerHTML = `
+                    <div class="text-center py-12 text-slate-500 bg-slate-900 border border-slate-800 rounded-2xl">
+                        <i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2 text-slate-600"></i>
+                        <p class="text-xs font-medium">No tasks found matching parameters</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            appState.filteredTasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm hover:border-slate-700/80 transition-all flex flex-col space-y-2.5 relative overflow-hidden group";
+                
+                // Color badges based on priority numbers (1-5 range standard in GoodDay)
+                let priorityColor = "bg-slate-800 text-slate-400";
+                if(task.priority >= 4) priorityColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                else if(task.priority == 3) priorityColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                else if(task.priority <= 2 && task.priority > 0) priorityColor = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+
+                // Format Date nicely
+                let deadlineHtml = '';
+                if(task.deadline) {
+                    const dateObj = new Date(task.deadline);
+                    const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                    const isOverdue = dateObj < new Date() && !(['closed', 'completed', 'done'].includes(task.status?.name?.toLowerCase()));
+                    deadlineHtml = `
+                        <div class="flex items-center text-[11px] ${isOverdue ? 'text-rose-400 font-bold' : 'text-slate-400'} bg-slate-950 px-2 py-1 rounded-md border border-slate-800/80">
+                            <i data-lucide="calendar" class="w-3 h-3 mr-1 ${isOverdue ? 'text-rose-400' : 'text-slate-500'}"></i>
+                            ${formattedDate}
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="text-[10px] font-mono tracking-wider text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">#${task.id.toString().substring(0,6)}</span>
+                        <span class="text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${task.status ? task.status.name : 'No Status'}</span>
+                    </div>
+                    <h4 class="font-bold text-sm text-slate-100 group-hover:text-indigo-400 transition-colors leading-snug">${task.name || 'Untitled Task'}</h4>
+                    <div class="flex items-center justify-between pt-1 border-t border-slate-800/40 mt-1">
+                        <span class="text-[10px] font-bold uppercase rounded-md px-1.5 py-0.5 ${priorityColor}">P${task.priority || '3'}</span>
+                        ${deadlineHtml}
+                    </div>
+                `;
+                
+                elements.tasksContainer.appendChild(card);
+            });
+
+            // Re-render premium icons dynamically
+            lucide.createIcons();
+        }
+
+        function showErrorState(msg) {
+            elements.tasksContainer.innerHTML = `
+                <div class="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-center">
+                    <i data-lucide="alert-triangle" class="w-6 h-6 text-rose-400 mx-auto mb-2"></i>
+                    <p class="text-xs text-rose-300 font-medium">Sync Interrupted: ${msg}</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Ensure CORS configurations are met or check API token status.</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
